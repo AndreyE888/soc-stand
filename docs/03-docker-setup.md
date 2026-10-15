@@ -244,7 +244,7 @@ Registry отвечает на HTTP-запросы. Пустой массив о
 cat /etc/docker/daemon.json
 ```
 
-<img width="1015" height="230" alt="image" src="https://github.com/user-attachments/assets/da452819-9414-4578-948a-d8c1ff289378" />
+<img width="957" height="204" alt="image" src="https://github.com/user-attachments/assets/f9683982-69df-4baa-b63b-ddc75396cb7e" />
 
 Docker настроен доверять Registry по HTTP. Без этой настройки `docker push` завершится ошибкой `http: server gave HTTP response to HTTPS client`, поскольку по умолчанию Docker требует HTTPS.
 
