@@ -371,4 +371,3 @@ docker images
 <img width="2501" height="229" alt="image" src="https://github.com/user-attachments/assets/d710ddf9-ea5c-4892-8ade-f1ad235c172f" />
 
 Оба тега ссылаются на один и тот же образ. Локально образ есть и с исходным именем, и с именем из Registry. Это подтверждает, что образ успешно прошёл полный цикл.
-```
