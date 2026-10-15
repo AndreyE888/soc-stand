@@ -469,6 +469,7 @@ curl -k https://localhost:5000/v2/_catalog
 
 ```bash
 sudo mkdir -p /etc/docker/certs.d/docker-registry:5000
+scp vagrant@docker-registry:/home/vagrant/certs/domain.crt /tmp/domain.crt
 ```
 
 <img width="2445" height="380" alt="image" src="https://github.com/user-attachments/assets/25caff9d-c2be-470e-b552-eda778dcfb05" />
@@ -484,7 +485,7 @@ sudo mkdir -p /etc/docker/certs.d/docker-registry:5000
 **Команда:**
 
 ```bash
-scp vagrant@docker-registry:/home/vagrant/certs/domain.crt /tmp/domain.crt
+sudo cp /tmp/domain.crt /etc/docker/certs.d/docker-registry:5000/ca.crt
 ```
 
 <img width="1739" height="96" alt="image" src="https://github.com/user-attachments/assets/2ba29222-d70b-495d-87f6-cf581629be1a" />
@@ -500,7 +501,7 @@ scp vagrant@docker-registry:/home/vagrant/certs/domain.crt /tmp/domain.crt
 **Команда:**
 
 ```bash
-sudo cp /tmp/domain.crt /etc/docker/certs.d/docker-registry:5000/ca.crt
+sudo systemctl restart docker
 ```
 
 <img width="941" height="93" alt="image" src="https://github.com/user-attachments/assets/68d7d170-d104-461b-bdea-cf361a1c38f6" />
@@ -516,7 +517,8 @@ sudo cp /tmp/domain.crt /etc/docker/certs.d/docker-registry:5000/ca.crt
 **Команда:**
 
 ```bash
-sudo systemctl restart docker
+sudo nano /etc/docker/daemon.json
+cat /etc/docker/daemon.json
 ```
 
 <img width="1003" height="164" alt="image" src="https://github.com/user-attachments/assets/fd428812-4100-485e-89bf-f649113ee57b" />
@@ -532,8 +534,7 @@ Docker перезапущен без ошибок.
 **Команды:**
 
 ```bash
-sudo nano /etc/docker/daemon.json
-cat /etc/docker/daemon.json
+docker pull docker-registry:5000/alpine
 ```
 
 <img width="2513" height="235" alt="image" src="https://github.com/user-attachments/assets/7d3ed2e3-3828-4155-8e97-f2e54a84e46e" />
@@ -549,7 +550,10 @@ cat /etc/docker/daemon.json
 **Команда:**
 
 ```bash
-openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 -out domain.crt -subj "/C=RU/CN=docker-registry" -addext "subjectAltName = DNS:docker-registry, DNS:docker-registry.local, IP:192.168.56.11"
+docker stop registry
+docker rm registry
+docker run -d --restart=always --name registry -p 5000:5000 -v /home/vagrant/certs:/certs -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key -e REGISTRY_STORAGE_DELETE_ENABLED=true registry:2
+docker ps
 ```
 
 <img width="2508" height="518" alt="image" src="https://github.com/user-attachments/assets/f96dbc4b-e24e-4f29-8914-176414f97b36" />
