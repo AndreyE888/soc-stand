@@ -1,4 +1,3 @@
-
 # SOC Stand
 
 Стенд из 3 виртуальных машин для развёртывания SOC-инструментов.
@@ -67,7 +66,7 @@ Vagrantfile уже создан в проекте, поэтому команда
 vagrant up
 ```
 
-Vagrant читает `Vagrantfile`, создаёт три VM из бокса и запускает их. При первом запуске скачивается бокс (~600 МБ), поэтому процесс может занять 10–30 минут. При последующих запусках VM поднимаются за 1–2 минуты.
+Vagrant читает `Vagrantfile`, создаёт три VM из бокса и запускает их. При первом запуске скачивается бокс (~600 МБ), поэтому процесс может занять 5-10 минут. При последующих запусках VM поднимаются за 1–2 минуты.
 
 ### Этап 4: Статус VM
 
@@ -99,7 +98,7 @@ vagrant ssh docker
 
 <img width="1503" height="798" alt="image" src="https://github.com/user-attachments/assets/2df1a6f1-016d-46ad-968d-d010042a61df" />
 
-Vagrant подключается к VM по SSH-ключу, пароль не запрашивается. Приглашение `vagrant@docker` подтверждает успешный вход в виртуальную машину.
+Vagrant подключается к VM по SSH-ключу, пароль не запрашивается. Приглашение `vagrant@docker` подтверждает успешный вход в виртуальную машину. Аналогично можно зайти в `docker_registry` и `storage` — команды `vagrant ssh docker_registry` и `vagrant ssh storage`.
 
 ### Этап 6: Проверка /etc/hosts
 
@@ -115,7 +114,7 @@ cat /etc/hosts
 
 <img width="1124" height="567" alt="image" src="https://github.com/user-attachments/assets/8decc3bb-d226-4976-a823-bef7bf5e8cb0" />
 
-Все три VM прописаны в локальном справочнике имён. Это позволяет обращаться к ним по имени, а не по IP-адресу — удобнее и безопаснее при изменениях адресации.
+Все три VM прописаны в локальном справочнике имён. Это позволяет обращаться к ним по имени, а не по IP-адресу — удобнее и безопаснее при изменениях адресации. Файл `/etc/hosts` нужно привести к такому виду **на всех трёх VM** — `docker`, `docker_registry` и `storage`.
 
 ### Этап 7: Ping между VM
 
@@ -131,7 +130,7 @@ ping docker-registry
 
 <img width="1518" height="389" alt="image" src="https://github.com/user-attachments/assets/e3dc8dfb-70e7-4462-b756-9836b7206a6a" />
 
-Потери пакетов 0%, имя разрешилось в IP `192.168.56.11`. Сеть между VM работает, `/etc/hosts` настроен корректно.
+Потери пакетов 0%, имя разрешилось в IP `192.168.56.11`. Сеть между VM работает, `/etc/hosts` настроен корректно. Для полной проверки стоит также пингануть `storage` с `docker` и наоборот.
 
 ### Этап 8: Список боксов
 
@@ -163,7 +162,7 @@ docker --version
 
 <img width="1034" height="117" alt="image" src="https://github.com/user-attachments/assets/74d4e65d-5229-455d-b112-1381e91f2b83" />
 
-Docker установлен, версия 29.1.3. Если выводится ошибка — Docker не установлен или не добавлен в PATH.
+Docker установлен, версия 29.1.3. Если выводится ошибка — Docker не установлен или не добавлен в PATH. **Установку Docker нужно выполнить также на `docker_registry`** (на `storage` Docker не нужен).
 
 ### Этап 10: Добавление в группу docker
 
@@ -179,7 +178,7 @@ sudo usermod -aG docker vagrant
 
 <img width="977" height="109" alt="image" src="https://github.com/user-attachments/assets/c583a7a3-dee5-450f-89e8-f18680276f4a" />
 
-Пользователь `vagrant` добавлен в группу `docker`. Это позволит работать с Docker без `sudo`. Флаг `-aG` добавляет в группу, не удаляя из остальных. Изменения вступают в силу после повторного входа в систему.
+Пользователь `vagrant` добавлен в группу `docker`. Это позволит работать с Docker без `sudo`. Флаг `-aG` добавляет в группу, не удаляя из остальных. Изменения вступают в силу после повторного входа в систему. **Команду нужно выполнить также на `docker_registry`.**
 
 ### Этап 11: Статус Docker
 
@@ -275,7 +274,7 @@ cat /etc/docker/daemon.json
 
 <img width="957" height="204" alt="image" src="https://github.com/user-attachments/assets/f9683982-69df-4baa-b63b-ddc75396cb7e" />
 
-Docker настроен доверять Registry по HTTP. Без этой настройки `docker push` завершится ошибкой `http: server gave HTTP response to HTTPS client`, поскольку по умолчанию Docker требует HTTPS.
+Docker настроен доверять Registry по HTTP. Без этой настройки `docker push` завершится ошибкой `http: server gave HTTP response to HTTPS client`, поскольку по умолчанию Docker требует HTTPS. После изменения файла нужно перезапустить Docker: `sudo systemctl restart docker`. **Настройку нужно выполнить на всех VM, которые будут работать с Registry** — то есть на `docker` (и позже на других клиентах).
 
 ### Этап 17: Pull alpine
 
@@ -372,4 +371,4 @@ docker images
 <img width="2501" height="229" alt="image" src="https://github.com/user-attachments/assets/d710ddf9-ea5c-4892-8ade-f1ad235c172f" />
 
 Оба тега ссылаются на один и тот же образ. Локально образ есть и с исходным именем, и с именем из Registry. Это подтверждает, что образ успешно прошёл полный цикл.
-
+```
