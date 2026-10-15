@@ -374,46 +374,236 @@ docker images
 
 Оба тега ссылаются на один и тот же образ. Локально образ есть и с исходным именем, и с именем из Registry. Это подтверждает, что образ успешно прошёл полный цикл.
 
+### Этап 23: Создание папки для сертификатов
 
+**Зачем:** подготовить место, где будут храниться ключ и сертификат.
+
+**Где:** VM `docker_registry`.
+
+**Команды:**
+
+```bash
+mkdir -p /home/vagrant/certs
+cd /home/vagrant/certs
+```
 
 <img width="1095" height="134" alt="image" src="https://github.com/user-attachments/assets/4af1bffb-299b-407a-aacc-76c94b9b2e7f" />
 
+Папка `/home/vagrant/certs` создана. Флаг `-p` создаёт все родительские папки и не ругается, если папка уже существует.
+
+### Этап 24: Генерация самоподписанного сертификата
+
+**Зачем:** создать SSL-сертификат, чтобы Registry мог работать по HTTPS.
+
+**Где:** VM `docker_registry`.
+
+**Команда:**
+
+```bash
+openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 -out domain.crt -subj "/C=RU/CN=docker-registry" -addext "subjectAltName = DNS:docker-registry, DNS:docker-registry.local, IP:192.168.56.11"
+```
 
 <img width="2515" height="824" alt="image" src="https://github.com/user-attachments/assets/ca26c8a0-9cdd-4961-80da-271d270d0fad" />
 
+Созданы два файла: `domain.key` — приватный ключ, `domain.crt` — публичный сертификат. Флаг `-x509` создаёт самоподписанный сертификат. `-addext "subjectAltName = ..."` добавляет SAN — без него Docker не примет сертификат (ошибка `legacy Common Name`).
+
+### Этап 25: Проверка файлов сертификата
+
+**Зачем:** убедиться, что оба файла созданы и лежат на месте.
+
+**Где:** VM `docker_registry`.
+
+**Команда:**
+
+```bash
+ls -la
+```
+
 <img width="1133" height="294" alt="image" src="https://github.com/user-attachments/assets/b4aeeecf-4b94-4f79-a395-7a547f0e8e1f" />
+
+В папке два файла: `domain.crt` (1858 байт) и `domain.key` (3272 байта). Число `1` в выводе — это количество ссылок на файл. Обычная ситуация.
+
+### Этап 26: Перезапуск Registry с TLS
+
+**Зачем:** запустить Registry так, чтобы он использовал наш сертификат для HTTPS.
+
+**Где:** VM `docker_registry`.
+
+**Команды:**
+
+```bash
+docker stop registry
+docker rm registry
+docker run -d --restart=always --name registry -p 5000:5000 -v /home/vagrant/certs:/certs -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key -e REGISTRY_STORAGE_DELETE_ENABLED=true registry:2
+docker ps
+```
 
 <img width="2540" height="526" alt="image" src="https://github.com/user-attachments/assets/4ec3e3c2-317d-443d-bfd7-d42d618d6265" />
 
+Registry запущен с TLS. Флаг `-v` подключает папку с сертификатами внутрь контейнера. Переменные `REGISTRY_HTTP_TLS_CERTIFICATE` и `REGISTRY_HTTP_TLS_KEY` указывают пути к сертификату и ключу.
+
+### Этап 27: Проверка HTTPS
+
+**Зачем:** убедиться, что Registry отвечает по HTTPS.
+
+**Где:** VM `docker_registry`.
+
+**Команды:**
+
+```bash
+curl https://localhost:5000/v2/_catalog
+curl -k https://localhost:5000/v2/_catalog
+```
+
 <img width="1454" height="381" alt="image" src="https://github.com/user-attachments/assets/8ad8b949-3f79-40ed-832e-865898943784" />
 
+Первая команда — ошибка `self-signed certificate`: curl не доверяет нашему сертификату. Вторая — с флагом `-k` (игнорировать проверку) — успешный ответ `{"repositories":[]}`. Значит, HTTPS работает.
 
+### Этап 28: Создание папки доверия на docker
+
+**Зачем:** подготовить место, куда Docker будет смотреть при подключении к Registry.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo mkdir -p /etc/docker/certs.d/docker-registry:5000
+```
 
 <img width="2445" height="380" alt="image" src="https://github.com/user-attachments/assets/25caff9d-c2be-470e-b552-eda778dcfb05" />
 
+Папка создана. Имя папки — это адрес Registry. Docker ищет сертификат именно здесь. На скриншоте видно сразу две команды: `mkdir` и `scp` — потому что выполнялись подряд.
+
+### Этап 29: Копирование сертификата с docker_registry
+
+**Зачем:** перенести публичный сертификат с сервера на клиент.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+scp vagrant@docker-registry:/home/vagrant/certs/domain.crt /tmp/domain.crt
+```
 
 <img width="1739" height="96" alt="image" src="https://github.com/user-attachments/assets/2ba29222-d70b-495d-87f6-cf581629be1a" />
 
+Сертификат скопирован в `/tmp/domain.crt`. При первом подключении SSH спросил про fingerprint — подтвердили `yes`. Ввели пароль `vagrant`. Копируем через `/tmp`, потому что `scp` не имеет прав `sudo` — потом перенесём в нужное место.
+
+### Этап 30: Установка сертификата в доверенные
+
+**Зачем:** положить сертификат туда, где Docker его ищет.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo cp /tmp/domain.crt /etc/docker/certs.d/docker-registry:5000/ca.crt
+```
 
 <img width="941" height="93" alt="image" src="https://github.com/user-attachments/assets/68d7d170-d104-461b-bdea-cf361a1c38f6" />
 
+Файл скопирован под именем `ca.crt`. Именно такое имя ищет Docker. Если назвать иначе — не найдёт.
+
+### Этап 31: Перезапуск Docker
+
+**Зачем:** Docker читает папку с сертификатами только при старте.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo systemctl restart docker
+```
 
 <img width="1003" height="164" alt="image" src="https://github.com/user-attachments/assets/fd428812-4100-485e-89bf-f649113ee57b" />
 
+Docker перезапущен без ошибок.
+
+### Этап 32: Удаление insecure-registries
+
+**Зачем:** HTTPS уже работает — insecure-режим больше не нужен.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo nano /etc/docker/daemon.json
+cat /etc/docker/daemon.json
+```
 
 <img width="2513" height="235" alt="image" src="https://github.com/user-attachments/assets/7d3ed2e3-3828-4155-8e97-f2e54a84e46e" />
 
+Файл `daemon.json` теперь пустой — строка с `insecure-registries` удалена. Docker работает только по HTTPS.
+
+### Этап 33: Ошибка с CN — пересоздание сертификата с SAN
+
+**Зачем:** Docker не принимает сертификаты, где указан только CN. Нужен SAN.
+
+**Где:** VM `docker_registry`.
+
+**Команда:**
+
+```bash
+openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 -out domain.crt -subj "/C=RU/CN=docker-registry" -addext "subjectAltName = DNS:docker-registry, DNS:docker-registry.local, IP:192.168.56.11"
+```
+
 <img width="2508" height="518" alt="image" src="https://github.com/user-attachments/assets/f96dbc4b-e24e-4f29-8914-176414f97b36" />
 
+Первая попытка дала ошибку `x509: certificate relies on legacy Common Name field, use SANs instead`. Пересоздали сертификат с флагом `-addext "subjectAltName = ..."`. Теперь Docker примет его.
 
+### Этап 34: Обновление сертификата на docker
+
+**Зачем:** заменить старый сертификат новым — с SAN.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+scp vagrant@docker-registry:/home/vagrant/certs/domain.crt /tmp/domain.crt
+sudo cp /tmp/domain.crt /etc/docker/certs.d/docker-registry:5000/ca.crt
+sudo systemctl restart docker
+```
 
 <img width="1784" height="166" alt="image" src="https://github.com/user-attachments/assets/a93d000f-ca53-4770-a2a3-a706d56a7df9" />
 <img width="1730" height="118" alt="image" src="https://github.com/user-attachments/assets/6071336e-19eb-4d59-b3a8-fe099518781b" />
 
+Новый сертификат скопирован на `docker` и заменил старый. Docker перезапущен.
+
+### Этап 35: Push по HTTPS
+
+**Зачем:** убедиться, что push работает по HTTPS без insecure-режима.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+docker push docker-registry:5000/alpine:latest
+```
+
 <img width="2544" height="468" alt="image" src="https://github.com/user-attachments/assets/825fe507-6a63-4bef-89d4-7fe37d2631ac" />
+
+Образ успешно отправлен: `Pushed`. Push по HTTPS работает — Docker доверяет сертификату.
+
+### Этап 36: Pull по HTTPS
+
+**Зачем:** проверить полный цикл — push и pull по HTTPS.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+docker rmi docker-registry:5000/alpine
+docker pull docker-registry:5000/alpine
+```
 
 <img width="1543" height="381" alt="image" src="https://github.com/user-attachments/assets/d074d45b-155c-42a6-8b52-a8243d490931" />
 
-
-
-
+Образ удалён локально (`Deleted`), потом скачан из Registry (`Downloaded`). Полный цикл по HTTPS работает: push → удаление → pull.
