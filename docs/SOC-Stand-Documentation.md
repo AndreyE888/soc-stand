@@ -646,3 +646,7 @@ docker pull docker-registry:5000/alpine
 <img width="2519" height="232" alt="image" src="https://github.com/user-attachments/assets/53395706-94c7-4545-9044-919f41a38b1f" />
 
 
+
+<img width="2528" height="524" alt="image" src="https://github.com/user-attachments/assets/b489c82e-940b-44f3-bc2a-da0bf27e40e8" />
+
+
