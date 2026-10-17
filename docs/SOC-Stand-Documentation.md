@@ -638,15 +638,36 @@ docker pull docker-registry:5000/alpine
 <img width="2078" height="898" alt="image" src="https://github.com/user-attachments/assets/a70096b6-aba2-4ce9-a5c9-eb19526afabc" />
 
 
-<img width="900" height="194" alt="image" src="https://github.com/user-attachments/assets/1562de69-c3b2-476c-9fb5-c224096029e5" />
 
 
 <img width="998" height="91" alt="image" src="https://github.com/user-attachments/assets/f5ea3e45-c983-4116-a3ad-fd88ca0bea58" />
 
 <img width="2519" height="232" alt="image" src="https://github.com/user-attachments/assets/53395706-94c7-4545-9044-919f41a38b1f" />
 
-
-
 <img width="2528" height="524" alt="image" src="https://github.com/user-attachments/assets/b489c82e-940b-44f3-bc2a-da0bf27e40e8" />
 
 
+<img width="1729" height="253" alt="image" src="https://github.com/user-attachments/assets/95e78a10-febd-4c38-8865-f1e255e3d0f1" />
+
+
+<img width="1511" height="883" alt="image" src="https://github.com/user-attachments/assets/9b779b9c-004d-4688-9f90-abca3b319fe1" />
+
+<img width="1632" height="213" alt="image" src="https://github.com/user-attachments/assets/63d01c93-dd7f-4b04-8d86-5c1111064241" />
+
+<img width="1171" height="148" alt="image" src="https://github.com/user-attachments/assets/7612497f-0e07-447f-b506-b3741c6315b4" />
+
+<img width="2548" height="903" alt="image" src="https://github.com/user-attachments/assets/b04b7d58-9d9e-4f07-a933-ad42b83e547a" />
+
+
+<img width="2559" height="1064" alt="image" src="https://github.com/user-attachments/assets/996c9c5a-bc46-467c-8387-d5d811aa4626" />
+
+
+<img width="1431" height="263" alt="image" src="https://github.com/user-attachments/assets/d3e6bc4f-57ed-425a-8ad1-a346c75c57d5" />
+
+
+<img width="2543" height="891" alt="image" src="https://github.com/user-attachments/assets/be7efc26-5d8b-424c-9a36-6de7171f9983" />
+
+
+<img width="977" height="90" alt="image" src="https://github.com/user-attachments/assets/98bbeac4-9fe5-4b72-b799-7da7d28ab46b" />
+
+<img width="2521" height="528" alt="image" src="https://github.com/user-attachments/assets/58887810-104f-4fe3-b090-872493a64324" />
