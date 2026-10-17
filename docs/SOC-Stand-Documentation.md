@@ -613,61 +613,398 @@ docker pull docker-registry:5000/alpine
 Образ удалён локально (`Deleted`), потом скачан из Registry (`Downloaded`). Полный цикл по HTTPS работает: push → удаление → pull.
 
 
+### Этап 37: Скачивание ключа Falco
+
+**Зачем:** Получить публичный ключ разработчиков Falco, чтобы `apt` мог проверять подлинность пакетов.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+curl -fsSL https://falco.org/repo/falcosecurity-packages.asc | sudo gpg --dearmor -o /usr/share/keyrings/falco-archive-keyring.gpg
+ls -la /usr/share/keyrings/falco-archive-keyring.gpg
+```
 
 <img width="2524" height="221" alt="image" src="https://github.com/user-attachments/assets/601c64a8-7f2d-484d-85f1-d400dd16d810" />
 
+Ключ успешно скачан и сохранен в системную директорию `/usr/share/keyrings/`.
+
+### Этап 38: Добавление репозитория Falco
+
+**Зачем:** Указать системе, откуда скачивать пакет Falco и каким ключом проверять подпись.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo nano /etc/apt/sources.list.d/falco.sources
+```
+
+*(Вставлены 5 строк конфигурации репозитория)*
+
+```bash
+cat /etc/apt/sources.list.d/falco.sources
+```
+
 <img width="1278" height="310" alt="image" src="https://github.com/user-attachments/assets/5b22e97b-bb3d-45c1-8a07-565fd833ee43" />
 
+Конфигурационный файл репозитория создан. Теперь `apt` знает о существовании Falco.
+
+### Этап 39: Обновление списков пакетов
+
+**Зачем:** Заставить `apt` прочитать новый файл репозитория и скачать метаданные о пакетах Falco.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo apt update
+```
 
 <img width="1809" height="1004" alt="image" src="https://github.com/user-attachments/assets/31c2a26e-153f-49f2-bc60-5efb2e61a3f1" />
 
+`apt` успешно скачал данные из репозитория `download.falco.org` (строки `Get:...`).
+
+### Этап 40: Установка Falco
+
+**Зачем:** Установить программу Falco на виртуальную машину.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo apt install -y falco
+```
 
 <img width="2536" height="401" alt="image" src="https://github.com/user-attachments/assets/b672fc1a-317d-402e-9e39-64d136b3129f" />
 
+Установщик автоматически определил ядро, выбрал драйвер `falco-modern-bpf` и запустил службу.
+
+### Этап 41: Проверка статуса Falco
+
+**Зачем:** Убедиться, что служба Falco работает, использует eBPF и загрузила правила.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo systemctl status falco
+```
+*(Выйти из статуса — `q`)*
 
 <img width="2077" height="878" alt="image" src="https://github.com/user-attachments/assets/159460a4-bbe0-4feb-a046-308bf494c73e" />
 
+Служба в статусе `active (running)`. В логах видно загрузку правил `/etc/falco/falco_rules.yaml` и использование `modern_ebpf`.
+
+### Этап 42: Настройка вывода Falco в файл
+
+**Зачем:** По умолчанию Falco пишет в системный журнал. Для отправки через `rsyslog` нужно перенаправить вывод в отдельный файл.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo nano /etc/falco/falco.yaml
+```
+
+*(Меняем `syslog_output` на `false`, `file_output` на `true` и указываем путь `/var/log/falco/events.log`)*
+
 <img width="953" height="95" alt="image" src="https://github.com/user-attachments/assets/c2bad2b9-230e-4f1a-8ab3-25f82ff79d96" />
 
+Файл конфигурации отредактирован (видно, что изменения сохранены).
+
+### Этап 43: Создание директории и перезапуск Falco
+
+**Зачем:** Создать папку для логов и применить новые настройки.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo mkdir -p /var/log/falco
+sudo systemctl restart falco
+```
 
 <img width="1541" height="817" alt="image" src="https://github.com/user-attachments/assets/7ef5ba11-dc08-4326-bf52-8bc19f9d0c72" />
 
+Falco перезапущен. Теперь он должен писать события в созданный файл.
+
+### Этап 44: Генерация тестового события
+
+**Зачем:** Проверить, что Falco реагирует на подозрительные действия и пишет их в файл.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo cat /etc/shadow > /dev/null
+sudo cat /var/log/falco/events.log
+```
 
 <img width="943" height="91" alt="image" src="https://github.com/user-attachments/assets/9276f8af-c2cf-4b21-b48d-738c7910e382" />
 
+Falco зафиксировал чтение файла `/etc/shadow` и записал событие `Warning Sensitive file opened...` в лог.
+
+### Этап 45: Генерация события внутри контейнера
+
+**Зачем:** Убедиться, что Falco видит подозрительную активность не только на хосте, но и внутри контейнеров.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+docker run --rm -it alpine /bin/sh
+```
+*(внутри контейнера написать `exit`)*
+
+```bash
+sudo cat /var/log/falco/events.log
+```
+
 <img width="2078" height="898" alt="image" src="https://github.com/user-attachments/assets/a70096b6-aba2-4ce9-a5c9-eb19526afabc" />
 
+В логе появилось новое событие `Notice A shell was spawned in a container...` с указанием имени контейнера и образа `alpine`.
 
+### Этап 46: Создание конфига rsyslog на docker
 
+**Зачем:** Настроить `rsyslog` на чтение файла Falco и отправку логов на `storage`.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo nano /etc/rsyslog.d/50-falco.conf
+```
+
+*(Вставлены модуль `imfile`, `input` с файлом Falco и `action omfwd`)*
+
+```bash
+cat /etc/rsyslog.d/50-falco.conf
+```
 
 <img width="998" height="91" alt="image" src="https://github.com/user-attachments/assets/f5ea3e45-c983-4116-a3ad-fd88ca0bea58" />
 
+Конфиг создан. Rsyslog будет отправлять файл `/var/log/falco/events.log` на IP `192.168.56.12`.
+
+### Этап 47: Первая попытка перезапуска rsyslog (Ошибка)
+
+**Зачем:** Применить настройки rsyslog.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo systemctl restart rsyslog
+sudo systemctl status rsyslog
+```
+
 <img width="2519" height="232" alt="image" src="https://github.com/user-attachments/assets/53395706-94c7-4545-9044-919f41a38b1f" />
+
+Возникла ошибка `No route to host` (на `storage` не был настроен прием) и `Permission denied` (rsyslog не мог прочитать файл Falco).
+
+### Этап 48: Настройка приема логов на storage
+
+**Зачем:** Настроить `storage` на прием логов по TCP порту 514 и сохранение по папкам.
+
+**Где:** VM `storage`.
+
+**Команда:**
+
+```bash
+sudo nano /etc/rsyslog.conf
+```
+*(Раскомментированы `module(load="imtcp")` и `input(type="imtcp" port="514")`)*
+
+```bash
+sudo nano /etc/rsyslog.d/50-remote.conf
+```
+*(Вставлен шаблон `$template RemoteLogs` и правило `*.* ?RemoteLogs`)*
 
 <img width="2528" height="524" alt="image" src="https://github.com/user-attachments/assets/b489c82e-940b-44f3-bc2a-da0bf27e40e8" />
 
+Настроен шаблон для раскладки входящих логов по папкам `/var/log/remote/<хост>/<программа>.log`.
+
+### Этап 49: Создание папки логов на storage
+
+**Зачем:** Создать директорию для приема логов и выдать права пользователю `syslog`.
+
+**Где:** VM `storage`.
+
+**Команды:**
+
+```bash
+sudo mkdir -p /var/log/remote
+sudo chown syslog:syslog /var/log/remote
+```
 
 <img width="1729" height="253" alt="image" src="https://github.com/user-attachments/assets/95e78a10-febd-4c38-8865-f1e255e3d0f1" />
 
+Папка создана, права выданы.
+
+### Этап 50: Перезапуск rsyslog на storage
+
+**Зачем:** Применить настройки приема логов.
+
+**Где:** VM `storage`.
+
+**Команды:**
+
+```bash
+sudo systemctl restart rsyslog
+sudo systemctl status rsyslog
+sudo ss -tlnp | grep 514
+```
 
 <img width="1511" height="883" alt="image" src="https://github.com/user-attachments/assets/9b779b9c-004d-4688-9f90-abca3b319fe1" />
 
+Служба `rsyslog` работает, порт 514 слушается (`LISTEN 0.0.0.0:514`).
+
+### Этап 51: Исправление прав на файл Falco
+
+**Зачем:** `rsyslog` работает от пользователя `syslog` и не может прочитать файл `/var/log/falco/events.log`, принадлежащий `root`.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo chmod 644 /var/log/falco/events.log
+```
+
 <img width="1632" height="213" alt="image" src="https://github.com/user-attachments/assets/63d01c93-dd7f-4b04-8d86-5c1111064241" />
+
+Права изменены, теперь `rsyslog` может читать лог.
+
+### Этап 52: Исправление синтаксиса rsyslog
+
+**Зачем:** Убрать параметр `StateFile`, который не поддерживается в версии rsyslog 8.23 внутри `input()`.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo nano /etc/rsyslog.d/50-falco.conf
+```
+*(Убран `StateFile`)*
+
+```bash
+sudo systemctl restart rsyslog
+sudo systemctl status rsyslog
+```
 
 <img width="1171" height="148" alt="image" src="https://github.com/user-attachments/assets/7612497f-0e07-447f-b506-b3741c6315b4" />
 
+Служба перезапущена без ошибок парсинга.
+
+### Этап 53: Повторная проверка статуса rsyslog
+
+**Зачем:** Убедиться, что rsyslog работает стабильно и без ошибок.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo systemctl status rsyslog
+```
+
 <img width="2548" height="903" alt="image" src="https://github.com/user-attachments/assets/b04b7d58-9d9e-4f07-a933-ad42b83e547a" />
 
+Служба в статусе `active (running)`, ошибок в логах нет.
+
+### Этап 54: Отправка логов и проверка на storage
+
+**Зачем:** Убедиться, что цепочка Falco → rsyslog → storage работает.
+
+**Где:** VM `docker` (генерация) и VM `storage` (проверка).
+
+**Команды:**
+
+```bash
+# На docker
+sudo cat /etc/shadow > /dev/null
+
+# На storage
+sudo cat /var/log/remote/docker/falco.log
+```
 
 <img width="2559" height="1064" alt="image" src="https://github.com/user-attachments/assets/996c9c5a-bc46-467c-8387-d5d811aa4626" />
 
+Логи Falco успешно дошли до `storage` и сохранились в файл `/var/log/remote/docker/falco.log`.
+
+### Этап 55: Итоговая проверка логов на storage
+
+**Зачем:** Показать, что все события (и старые, и новые) сохраняются на `storage`.
+
+**Где:** VM `storage`.
+
+**Команда:**
+
+```bash
+sudo cat /var/log/remote/docker/falco.log
+```
 
 <img width="1431" height="263" alt="image" src="https://github.com/user-attachments/assets/d3e6bc4f-57ed-425a-8ad1-a346c75c57d5" />
 
+В логе видно несколько событий (чтение `/etc/shadow` и запуск `sh` в контейнере) с метками времени.
+
+### Этап 56: Проверка статуса Falco после всех настроек
+
+**Зачем:** Убедиться, что Falco продолжает работать корректно.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+sudo systemctl status falco
+```
 
 <img width="2543" height="891" alt="image" src="https://github.com/user-attachments/assets/be7efc26-5d8b-424c-9a36-6de7171f9983" />
 
+Falco в статусе `active (running)`, использует eBPF и загрузил правила.
+
+### Этап 57: Проверка конфига rsyslog на docker
+
+**Зачем:** Показать финальный вид конфигурационного файла.
+
+**Где:** VM `docker`.
+
+**Команда:**
+
+```bash
+cat /etc/rsyslog.d/50-falco.conf
+```
 
 <img width="977" height="90" alt="image" src="https://github.com/user-attachments/assets/98bbeac4-9fe5-4b72-b799-7da7d28ab46b" />
 
+Конфиг содержит только три рабочие строки без ошибок.
+
+### Этап 58: Финальная проверка логов на storage
+
+**Зачем:** Финальное подтверждение работы системы логирования.
+
+**Где:** VM `storage`.
+
+**Команда:**
+
+```bash
+sudo cat /var/log/remote/docker/falco.log
+```
+
 <img width="2521" height="528" alt="image" src="https://github.com/user-attachments/assets/58887810-104f-4fe3-b090-872493a64324" />
+
+Все события Falco успешно доставлены и сохранены на `storage`.
+```
