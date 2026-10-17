@@ -1007,4 +1007,51 @@ sudo cat /var/log/remote/docker/falco.log
 <img width="2521" height="528" alt="image" src="https://github.com/user-attachments/assets/58887810-104f-4fe3-b090-872493a64324" />
 
 Все события Falco успешно доставлены и сохранены на `storage`.
-```
+
+
+
+
+
+
+<img width="2524" height="221" alt="image" src="https://github.com/user-attachments/assets/601c64a8-7f2d-484d-85f1-d400dd16d810" />
+
+<img width="1278" height="310" alt="image" src="https://github.com/user-attachments/assets/5b22e97b-bb3d-45c1-8a07-565fd833ee43" />
+
+<img width="1809" height="1004" alt="image" src="https://github.com/user-attachments/assets/31c2a26e-153f-49f2-bc60-5efb2e61a3f1" />
+
+<img width="2536" height="401" alt="image" src="https://github.com/user-attachments/assets/b672fc1a-317d-402e-9e39-64d136b3129f" />
+
+<img width="2077" height="878" alt="image" src="https://github.com/user-attachments/assets/159460a4-bbe0-4feb-a046-308bf494c73e" />
+
+
+<img width="1541" height="817" alt="image" src="https://github.com/user-attachments/assets/7ef5ba11-dc08-4326-bf52-8bc19f9d0c72" />
+
+<img width="943" height="91" alt="image" src="https://github.com/user-attachments/assets/9276f8af-c2cf-4b21-b48d-738c7910e382" />
+
+<img width="2078" height="898" alt="image" src="https://github.com/user-attachments/assets/a70096b6-aba2-4ce9-a5c9-eb19526afabc" />
+
+<img width="998" height="91" alt="image" src="https://github.com/user-attachments/assets/f5ea3e45-c983-4116-a3ad-fd88ca0bea58" />
+
+<img width="2519" height="232" alt="image" src="https://github.com/user-attachments/assets/53395706-94c7-4545-9044-919f41a38b1f" />
+
+<img width="2528" height="524" alt="image" src="https://github.com/user-attachments/assets/b489c82e-940b-44f3-bc2a-da0bf27e40e8" />
+
+<img width="1729" height="253" alt="image" src="https://github.com/user-attachments/assets/95e78a10-febd-4c38-8865-f1e255e3d0f1" />
+
+<img width="1511" height="883" alt="image" src="https://github.com/user-attachments/assets/9b779b9c-004d-4688-9f90-abca3b319fe1" />
+
+<img width="1632" height="213" alt="image" src="https://github.com/user-attachments/assets/63d01c93-dd7f-4b04-8d86-5c1111064241" />
+
+<img width="1171" height="148" alt="image" src="https://github.com/user-attachments/assets/7612497f-0e07-447f-b506-b3741c6315b4" />
+
+<img width="2548" height="903" alt="image" src="https://github.com/user-attachments/assets/b04b7d58-9d9e-4f07-a933-ad42b83e547a" />
+
+<img width="2559" height="1064" alt="image" src="https://github.com/user-attachments/assets/996c9c5a-bc46-467c-8387-d5d811aa4626" />
+
+<img width="1431" height="263" alt="image" src="https://github.com/user-attachments/assets/d3e6bc4f-57ed-425a-8ad1-a346c75c57d5" />
+
+<img width="2543" height="891" alt="image" src="https://github.com/user-attachments/assets/be7efc26-5d8b-424c-9a36-6de7171f9983" />
+
+<img width="977" height="90" alt="image" src="https://github.com/user-attachments/assets/98bbeac4-9fe5-4b72-b799-7da7d28ab46b" />
+
+<img width="2521" height="528" alt="image" src="https://github.com/user-attachments/assets/58887810-104f-4fe3-b090-872493a64324" />
