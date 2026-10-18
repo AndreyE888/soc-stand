@@ -1167,5 +1167,67 @@ sudo systemctl status falcosidekick
 
 Служба успешно запущена (`active (running)`) и добавлена в автозагрузку (`enabled`). В логах видно, что Falcosidekick версии 2.31.0 успешно инициализировал вывод в Telegram (`Enabled Outputs: [Telegram]`) и начал прослушивать порт `2801` для приема событий от Falco.
 
+### Этап 68: Включение JSON-вывода в Falco
+
+**Зачем:** Настроить Falco на формирование логов в формате JSON, чтобы Falcosidekick мог корректно их парсить и передавать в Telegram в читаемом виде.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo nano /etc/falco/falco.yaml
+```
+*(В файле включены параметры `json_output` и `json_include_output_property`)*
+
+```yaml
+json_output: true
+json_include_output_property: true
+```
+
+<img src="https://github.com/user-attachments/assets/ae0f48d3-14d3-40ad-a047-3d329bcc4262" alt="image" />
+
+В конфигурационном файле `falco.yaml` активирован вывод в формате JSON (`json_output: true`). Также включен параметр `json_include_output_property`, который добавляет в JSON-объект текстовое поле `output` с описанием события, чтобы уведомление в Telegram было информативным.
+
+### Этап 69: Включение HTTP-вывода в Falco
+
+**Зачем:** Настроить Falco на отправку событий по HTTP на локальный порт, где их будет принимать Falcosidekick для дальнейшей пересылки в Telegram.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo nano /etc/falco/falco.yaml
+```
+*(В файле активирован блок `http_output`)*
+
+```yaml
+http_output:
+  enabled: true
+  url: "http://localhost:2801/"
+```
+
+<img src="https://github.com/user-attachments/assets/ef148ee2-b144-4730-a406-3239410e0fea" alt="image" />
+
+В конфигурации Falco включен `http_output`. Теперь при генерации алерта Falco будет отправлять JSON-запрос на `localhost:2801`, где его ожидает запущенный сервис Falcosidekick.<img 
+
+### Этап 70: Генерация тестового события для Telegram
+
+**Зачем:** Перезапустить Falco с обновленным конфигом и сгенерировать событие, чтобы проверить сквозную цепочку отправки алерта в мессенджер.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo systemctl restart falco
+docker run --rm --privileged alpine true
+```
+
+<img src="https://github.com/user-attachments/assets/f9fbe882-7373-47d2-b63b-9d826ef78ffb" alt="image" />
+
+Falco перезапущен, применены настройки `http_output`. Выполнен запуск привилегированного контейнера. Сгенерированный алерт должен быть отправлен в Falcosidekick и далее перенаправлен в Telegram-бот.
+
 
 
