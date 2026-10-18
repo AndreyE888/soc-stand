@@ -806,8 +806,6 @@ sudo cat /var/log/falco/events.log
 
 <img width="2528" height="524" alt="image" src="https://github.com/user-attachments/assets/b489c82e-940b-44f3-bc2a-da0bf27e40e8" />
 
-*(На скриншоте также видна опечатка в пути `/vat/log/` и последующее исправление на `/var/log/`).*
-
 В логе появилось второе событие: `Notice A shell was spawned in a container...`. В нем указано имя контейнера (`dreamy_brahmagupta`) и образ (`alpine`). Это доказывает, что Falco отслеживает процессы внутри контейнеров.
 
 ### Этап 48: Создание конфига rsyslog на docker
