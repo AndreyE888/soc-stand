@@ -1000,3 +1000,57 @@ sudo cat /var/log/remote/docker/falco.log
 
 Это доказывает, что цепочка `Falco` → `rsyslog` → `storage` работает корректно.
 
+### Этап 59: Создание кастомного правила Falco
+
+**Зачем:** Штатные правила не всегда гарантируют детект запуска привилегированного контейнера. Создадим правило, которое ловит сам факт вызова `docker run --privileged`.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo nano /etc/falco/falco_rules.local.yaml
+```
+
+
+<img src="https://github.com/user-attachments/assets/b982b969-0675-468a-a118-79904bc65c1a" alt="image" />
+
+Правило добавлено в файл локальных правил. Оно отслеживает запуск процесса `docker` с аргументами `run` и `--privileged`, используя макрос `spawned_process`.
+
+
+### Этап 60: Проверка кастомного правила
+
+**Зачем:** Убедиться, что созданное правило детектирует запуск привилегированного контейнера после перезапуска сервиса.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo systemctl restart falco
+docker run --rm --privileged alpine true
+```
+
+<img src="https://github.com/user-attachments/assets/57747ff9-4560-4251-a263-3d1ed58696f7" alt="image" />
+
+Falco перезапущен с новым конфигом. Выполнен запуск контейнера с флагом `--privileged`. Правило отслеживает сам вызов команды, поэтому контейнер завершается мгновенно, но событие фиксируется Falco.
+
+
+### Этап 61: Проверка доставки кастомного события на storage
+
+**Зачем:** Убедиться, что событие от нового правила Falco успешно передано через rsyslog и сохранено на центральном сервере.
+
+**Где:** VM `storage`.
+
+**Команды:**
+
+```bash
+sudo tail -n 5 /var/log/remote/docker/falco.log
+```
+
+<img src="https://github.com/user-attachments/assets/9db17713-4ddf-400a-ac5d-62abab7d0b68" alt="image" />
+
+В логе на `storage` отображается событие `Warning Привилегированный контейнер запущен`, сгенерированное на `docker`. Цепочка Falco → rsyslog → storage работает корректно для кастомных правил.
+
+
+
