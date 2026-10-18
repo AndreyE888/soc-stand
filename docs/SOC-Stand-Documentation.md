@@ -492,9 +492,9 @@ sudo cp /tmp/domain.crt /etc/docker/certs.d/docker-registry:5000/ca.crt
 
 Сертификат скопирован в `/tmp/domain.crt`. При первом подключении SSH спросил про fingerprint — подтвердили `yes`. Ввели пароль `vagrant`. Копируем через `/tmp`, потому что `scp` не имеет прав `sudo` — потом перенесём в нужное место.
 
-### Этап 30: Установка сертификата в доверенные
+### Этап 30: Перезапуск Docker
 
-**Зачем:** положить сертификат туда, где Docker его ищет.
+**Зачем:** Docker не видит новый сертификат, пока не перезапустится служба.
 
 **Где:** VM `docker`.
 
@@ -506,11 +506,11 @@ sudo systemctl restart docker
 
 <img width="941" height="93" alt="image" src="https://github.com/user-attachments/assets/68d7d170-d104-461b-bdea-cf361a1c38f6" />
 
-Файл скопирован под именем `ca.crt`. Именно такое имя ищет Docker. Если назвать иначе — не найдёт.
+Docker перезапущен. Теперь он применит настройки доверия к сертификату, который мы положили в /etc/docker/certs.d/.
 
-### Этап 31: Перезапуск Docker
+## Этап 31: Удаление insecure-registries
 
-**Зачем:** Docker читает папку с сертификатами только при старте.
+**Зачем:** HTTPS уже работает, поэтому режим `insecure-registries` (без шифрования) больше не нужен. Оставлять его — снижать безопасность.
 
 **Где:** VM `docker`.
 
@@ -523,11 +523,11 @@ cat /etc/docker/daemon.json
 
 <img width="1003" height="164" alt="image" src="https://github.com/user-attachments/assets/fd428812-4100-485e-89bf-f649113ee57b" />
 
-Docker перезапущен без ошибок.
+Файл daemon.json теперь пустой — строка с insecure-registries удалена. Docker будет работать только по HTTPS.
 
-### Этап 32: Удаление insecure-registries
+### Этап 32: Ошибка с CN — проверка сертификата
 
-**Зачем:** HTTPS уже работает — insecure-режим больше не нужен.
+**Зачем:** Docker отказывается работать с сертификатом, в котором нет поля SAN (Subject Alternative Name). Нужно увидеть ошибку и понять причину.
 
 **Где:** VM `docker`.
 
@@ -539,11 +539,12 @@ docker pull docker-registry:5000/alpine
 
 <img width="2513" height="235" alt="image" src="https://github.com/user-attachments/assets/7d3ed2e3-3828-4155-8e97-f2e54a84e46e" />
 
-Файл `daemon.json` теперь пустой — строка с `insecure-registries` удалена. Docker работает только по HTTPS.
+Ошибка: tls: failed to verify certificate: x509: certificate relies on legacy Common Name field, use SANs instead. Docker (начиная с версии 1.15) требует, чтобы в сертификате было поле SAN, а не только CN. Придётся пересоздать сертификат.
 
-### Этап 33: Ошибка с CN — пересоздание сертификата с SAN
 
-**Зачем:** Docker не принимает сертификаты, где указан только CN. Нужен SAN.
+### Этап 33: Пересоздание сертификата с SAN
+
+**Зачем:** Docker требует наличие поля SAN (Subject Alternative Name). Пересоздаём сертификат с правильным полем, чтобы Docker мог его принять.
 
 **Где:** VM `docker_registry`.
 
@@ -558,7 +559,8 @@ docker ps
 
 <img width="2508" height="518" alt="image" src="https://github.com/user-attachments/assets/f96dbc4b-e24e-4f29-8914-176414f97b36" />
 
-Первая попытка дала ошибку `x509: certificate relies on legacy Common Name field, use SANs instead`. Пересоздали сертификат с флагом `-addext "subjectAltName = ..."`. Теперь Docker примет его.
+Сертификат пересоздан с полем subjectAltName. Registry перезапущен с новым сертификатом. Теперь Docker должен принять его.
+
 
 ### Этап 34: Обновление сертификата на docker
 
