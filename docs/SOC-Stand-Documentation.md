@@ -1053,4 +1053,119 @@ sudo tail -n 5 /var/log/remote/docker/falco.log
 В логе на `storage` отображается событие `Warning Привилегированный контейнер запущен`, сгенерированное на `docker`. Цепочка Falco → rsyslog → storage работает корректно для кастомных правил.
 
 
+### Этап 62: Загрузка утилиты Falcosidekick
+
+**Зачем:** Скачать бинарный файл Falcosidekick, который будет выступать в роли промежуточного звена для пересылки алертов Falco во внешние системы (например, Telegram).
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+curl -L -o falcosidekick.tar.gz https://github.com/falcosecurity/falcosidekick/releases/download/2.31.0/falcosidekick_2.31.0_linux_amd64.tar.gz
+```
+
+<img src="https://github.com/user-attachments/assets/b01ecbeb-1dfa-4194-b1fd-ba44d1f4ca4c" alt="image" />
+
+Архив с утилитой успешно скачан с официального репозитория GitHub. Размер файла составляет 47.8 МБ.
+
+### Этап 63: Распаковка и установка Falcosidekick
+
+**Зачем:** Извлечь бинарный файл из архива, переместить его в системную директорию и проверить работоспособность утилиты.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+tar -xzf falcosidekick.tar.gz
+sudo mv falcosidekick /usr/local/bin/
+falcosidekick --version
+```
+
+<img src="https://github.com/user-attachments/assets/62c1dcf8-1c7b-4e3f-a161-2b9da88530fd" alt="image" />
+
+Команда `tar` распаковала архив, после чего файл был перемещён в `/usr/local/bin/` для глобального доступа. Вызов с флагом `--version` подтвердил успешную установку (версия 2.31.0, платформа linux/amd64).
+
+
+### Этап 64: Создание конфигурационного файла Falcosidekick
+
+**Зачем:** Создать директорию и файл настроек, в котором будут указаны токен Telegram-бота и Chat ID получателя для пересылки алертов.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo mkdir -p /etc/falcosidekick
+sudo nano /etc/falcosidekick/config.yaml
+```
+*(В файл добавлен блок настроек `telegram` с токеном и Chat ID)*
+
+<img src="https://github.com/user-attachments/assets/7459c85e-2699-4cbc-9c52-fc5fe5e0a444" alt="image" />
+<img width="1663" height="259" alt="image" src="https://github.com/user-attachments/assets/5a0fd0f2-05ad-44b6-85b0-9eea23ec8d26" />
+
+
+Создана директория `/etc/falcosidekick`. В редакторе `nano` открыт файл `config.yaml` для внесения параметров интеграции с Telegram.
+
+
+### Этап 65: Создание Telegram-бота для алертов
+
+**Зачем:** Зарегистрировать нового бота в Telegram через BotFather, который будет выступать в роли получателя уведомлений от системы Falco.
+
+**Где:** Telegram (хост-машина).
+
+**Команды:**
+
+*(В чате с `@BotFather` отправлены команды)*
+```text
+/newbot
+SOC Stand Alerts
+my_soc_stand_alerts_bot
+```
+
+<img src="https://github.com/user-attachments/assets/8f29b5e1-f53a-4e0c-9934-1126e0db5600" alt="image" />
+
+Бот успешно создан. Имя бота — `SOC Stand Alerts`, username — `my_soc_stand_alerts_bot`. (Первый предложенный username `my_soc_alerts_bot` был отклонен, так как уже занят). BotFather выдал токен для дальнейшей настройки интеграции.
+
+
+### Этап 66: Создание службы systemd для Falcosidekick
+
+**Зачем:** Превратить Falcosidekick в системный демон (службу), который будет работать в фоне и автоматически запускаться при старте виртуальной машины, а также перезапускаться в случае сбоев.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo nano /etc/systemd/system/falcosidekick.service
+```
+*(В файл добавлен блок конфигурации службы)*
+
+
+<img src="https://github.com/user-attachments/assets/3aa74bd3-f9e1-4f6f-92ef-3c2da4ee775a" alt="image" />
+
+Файл службы создан. Параметр `After=network.target` гарантирует, что Falcosidekick запустится только после поднятия сети (нужно для работы с Telegram). `Restart=always` обеспечивает автоматический перезапуск при сбоях, а `WantedBy=multi-user.target` добавляет службу в автозагрузку системы.
+
+
+### Этап 67: Запуск службы Falcosidekick
+
+**Зачем:** Активировать службу в systemd, запустить её и убедиться, что она успешно работает в фоне, прослушивает порт и видит нужный Output (Telegram).
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable falcosidekick
+sudo systemctl start falcosidekick
+sudo systemctl status falcosidekick
+```
+
+<img src="https://github.com/user-attachments/assets/8feb97e5-7cfd-46d1-8caf-f32c23eceec6" alt="image" />
+
+Служба успешно запущена (`active (running)`) и добавлена в автозагрузку (`enabled`). В логах видно, что Falcosidekick версии 2.31.0 успешно инициализировал вывод в Telegram (`Enabled Outputs: [Telegram]`) и начал прослушивать порт `2801` для приема событий от Falco.
+
+
 
