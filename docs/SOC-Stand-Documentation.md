@@ -1230,4 +1230,42 @@ docker run --rm --privileged alpine true
 Falco перезапущен, применены настройки `http_output`. Выполнен запуск привилегированного контейнера. Сгенерированный алерт должен быть отправлен в Falcosidekick и далее перенаправлен в Telegram-бот.
 
 
+## Безопасность цепочки поставок (Cosign)
+
+### Этап 1: Загрузка утилиты Cosign
+
+**Зачем:** Скачать официальный бинарный файл Cosign (v3.1.3) для подписи и проверки контейнерных образов.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+curl -L -o cosign https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-amd64
+```
+
+<img src="https://github.com/user-attachments/assets/fcbf6567-35a8-4ed2-acfe-d7e82f828978" alt="image" />
+
+Выбран и скачан бинарник `cosign-linux-amd64` с официального репозитория Sigstore. Версия `amd64` соответствует архитектуре процессора виртуальной машины (x86_64). Размер файла — 134 МБ.
+
+
+### Этап 2: Установка и проверка Cosign
+
+**Зачем:** Сделать бинарный файл исполняемым, переместить его в системную директорию (чтобы команда была доступна глобально) и убедиться в работоспособности утилиты.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+chmod +x cosign
+sudo mv cosign /usr/local/bin/
+cosign version
+```
+*(Примечание: команда `cosign --version` выдает ошибку, так как Cosign использует синтаксис без дефисов).*
+
+<img src="https://github.com/user-attachments/assets/5d85b3f1-b6bd-4fff-bece-ba2faba8a47e" alt="image" />
+
+Утилита Cosign успешно установлена. Вывод команды `cosign version` подтверждает, что версия (v3.1.3) установлена корректно для платформы `linux/amd64`.
+
 
