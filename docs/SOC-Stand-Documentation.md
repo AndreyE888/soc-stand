@@ -1513,14 +1513,6 @@ sudo tail -n 1 /var/log/falco/events.log
 
 ```bash
 sudo nano /usr/local/bin/docker
-```
-*(В блок ошибки скрипта добавлен вызов утилиты `logger`)*
-
-```bash
-logger -t falco-enforcement "БЛОКИРОВКА: Попытка запуска неподписанного образа $IMAGE"
-```
-
-```bash
 docker run --rm docker-registry:5000/my-signed-app@sha256:c2545a1e4506e0ef3dd1c31151a44044a610862eed38d1683cef83c555b946725
 sudo tail -n 1 /var/log/falco/events.log
 ```
