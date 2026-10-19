@@ -1347,21 +1347,21 @@ cosign sign --key cosign.key --registry-cacert /etc/docker/certs.d/docker-regist
 Образ успешно подписан по его уникальному дайджесту. Подпись (signature) сформирована и загружена в Registry.
 
 
-### Этап 7: Проверка цифровой подписи образа
+### Этап 7: Проверка подписи по дайджесту
 
-**Зачем:** Убедиться, что подпись валидна, создана доверенным ключом и соответствует текущему содержимому образа в Registry.
+**Зачем:** Убедиться, что подпись привязана к неизменяемому математическому отпечатку образа (дайджесту). Это исключает риск подмены тега (`v1`) и гарантирует целостность артефакта.
 
 **Где:** VM `docker`.
 
 **Команды:**
 
 ```bash
-cosign verify --key cosign.pub --registry-cacert /etc/docker/certs.d/docker-registry:5000/ca.crt docker-registry:5000/my-signed-app:v1
+cosign verify --key cosign.pub --registry-cacert /etc/docker/certs.d/docker-registry:5000/ca.crt docker-registry:5000/my-signed-app@sha256:c2545a1e4506e0ef3dd1c31151a44044a610862eed38d1683cef83c555b94672
 ```
 
-<img src="https://github.com/user-attachments/assets/842a7bc1-200c-43ca-895a-3a179b4648c7" alt="image" />
+<img src="https://github.com/user-attachments/assets/4c3baea1-1069-44eb-94cd-fa9efdc33bbe" alt="image" />
 
-Проверка прошла успешно. Утилита подтвердила, что подпись валидна (`The signatures were verified against the specified public key`), а хэш (`docker-manifest-digest`), указанный в подписи, совпадает с хэшем текущего образа в Registry. Это доказывает целостность артефакта.
+Проверка подписи по дайджесту прошла успешно. Вывод подтверждает, что подпись расшифрована публичным ключом (`The signatures were verified against the specified public key`), а дайджест подписанного образа (`docker-manifest-digest`) в точности совпадает с тем, который мы указали в команде. Целостность образа подтверждена.
 
 
 ### Этап 8: Демонстрация уязвимости (запуск неподписанного контейнера)
