@@ -1624,41 +1624,80 @@ nano authz.rego
 *(В файл добавлена политика безопасности на языке Rego)*
 ```rego
 package docker.authz
+
 # По умолчанию запрещаем всё (Zero Trust)
 default allow = false
 
 # 1. Разрешаем, если это обычный запуск без privileged
-allow {
+allow if {
     input.command == "run"
     not input.privileged
 }
 
 # 2. Запрещаем запуск привилегированных контейнеров
-deny[msg] {
+deny contains msg if {
     input.privileged == true
     msg = "Запуск привилегированных контейнеров (--privileged) запрещен!"
 }
 
 # 3. Запрещаем использование тега latest (требуем фиксированную версию)
-deny[msg] {
+deny contains msg if {
     input.image
     endswith(input.image, ":latest")
     msg = "Использование тега 'latest' запрещено. Укажите конкретную версию."
 }
 
 # 4. Запрещаем запуск от имени root
-deny[msg] {
+deny contains msg if {
     input.user == "root"
     msg = "Запуск контейнеров от имени root запрещен!"
 }
 ```
 
-<img src="https://github.com/user-attachments/assets/305758ee-4d45-4359-a4f6-7566d16b29c8" alt="image" />
+<img width="1618" height="1157" alt="image" src="https://github.com/user-attachments/assets/49a3299f-7be8-47a1-bdaf-96e83f0c8633" />
 
 Создан файл политики `authz.rego`. В нем реализованы четыре правила: базовое разрешение для безопасных запусков, а также три запрещающих правила (`deny`), которые формируют сообщения об ошибках при попытке использовать привилегированный режим, тег `latest` или запустить контейнер от имени `root`.
 
 
+### Этап 6: Перенос политики и обновление конфигурации службы OPA
 
+**Зачем:** Разместить файл политики в системной директории (согласно стандарту FHS) и указать OPA путь к этой папке при запуске, чтобы он загружал правила в память.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo mkdir -p /etc/opa/policies
+sudo mv /home/vagrant/authz.rego /etc/opa/policies/
+sudo nano /etc/systemd/system/opa.service
+```
+*(В файле службы изменена строка `ExecStart`, добавлен путь к директории с политиками)*
+
+```ini
+ExecStart=/usr/local/bin/opa run --server --addr=127.0.0.1:8181 /etc/opa/policies
+```
+
+<img width="1334" height="167" alt="image" src="https://github.com/user-attachments/assets/416e29a1-f219-4c28-8d22-c81a91fd0b95" />
+<img width="1611" height="505" alt="image" src="https://github.com/user-attachments/assets/71f95e36-4ae3-41da-82ec-ab2f91c49b2e" />
+
+Файл `authz.rego` перемещен в `/etc/opa/policies/` для ограничения прав доступа (только `root`). В конфигурацию `systemd` добавлен путь к этой директории, чтобы OPA при старте автоматически подгружал все файлы политик из нее.
+
+### Этап 7: Проверка загрузки политики в OPA
+
+**Зачем:** Убедиться, что запущенный сервис OPA успешно прочитал файл политики из системной директории и готов применять правила.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+curl -s http://127.0.0.1:8181/v1/policies
+```
+
+<img width="2559" height="1357" alt="image" src="https://github.com/user-attachments/assets/b75d2bdb-b9bd-429b-a692-e9aead1a66a8" />
+
+API OPA вернул JSON-объект с информацией о загруженной политике. В ответе виден исходный код (`raw`), абстрактное синтаксическое дерево (`ast`) и комментарии (`comments`), привязанные к файлу `/etc/opa/policies/authz.rego`. Это подтверждает, что правила успешно загружены в память и готовы к выполнению.
 
 
 
