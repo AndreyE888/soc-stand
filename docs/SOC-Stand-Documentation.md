@@ -1931,7 +1931,119 @@ sudo docker run --rm alpine:latest echo "Запрещено"
 
 <img width="1353" height="252" alt="image" src="https://github.com/user-attachments/assets/590b2e62-fb23-4dc9-9915-14d602332545" />
 
-Оба контейнера (`alpine:3.19` и `alpine:latest`) успешно запустились. Это означает, что текущая политика не работает должным образом в связке с managed-плагином, так как он не передает нужные поля. Принято решение перейти на архитектуру **legacy plugin** (запуск плагина как отдельного сервиса на хосте), что даст больше контроля над форматом данных и позволит использовать актуальную версию OPA.
+Оба контейнера (`alpine:3.19` и `alpine:latest`) успешно запустились. Это означает, что текущая политика не работает должным образом в связке с managed-плагином, так как он не передает нужные поля. 
+
+### Этап 18: Пересоздание AuthZ-плагина с указанием файла политики
+
+**Зачем:** Выполнить чистую установку плагина `opa-authz`, передав ему параметр `opa-args` с путем к файлу политики. Это позволяет избежать ошибок, связанных с отсутствием файла политики при старте плагина.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo docker plugin disable opa-authz
+sudo docker plugin rm opa-authz
+sudo docker plugin install openpolicyagent/opa-docker-authz-v2:0.9 --alias opa-authz --grant-all-permissions opa-args="-policy-file /opa/authz.rego"
+```
+
+<img width="2522" height="418" alt="image" src="https://github.com/user-attachments/assets/b45eaf3c-6486-4d62-9268-fe691ce27c7c" />
+
+Плагин был корректно отключен и удален. При повторной установке мы явно передали аргумент `-policy-file /opa/authz.rego` через `opa-args`. Это гарантирует, что при запуске плагин будет искать политику по правильному пути внутри контейнера (который мы пробросили ранее).
+
+### Этап 19: Проверка конфигурации плагина и Docker Daemon
+
+**Зачем:** Убедиться, что плагин `opa-authz` успешно установлен, включен и корректно прописан в конфигурации демона Docker для перехвата запросов.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo docker plugin ls
+cat /etc/docker/daemon.json
+```
+
+<img width="1729" height="312" alt="image" src="https://github.com/user-attachments/assets/6f72233c-3d4d-47ef-a848-8eccd38f3b0a" />
+
+Плагин `opa-authz` находится в статусе `ENABLED: true`. В конфигурационном файле `/etc/docker/daemon.json` присутствует директива `"authorization-plugins": ["opa-authz"]`. Связка настроена корректно, Docker готов передавать запросы на авторизацию в OPA.
+
+
+### Этап 20: Приведение политики OPA к финальному рабочему виду
+
+**Зачем:** Переписать файл политики `/etc/docker/authz.rego`, используя реальную структуру HTTP-запросов Docker API (поля `input.Body.Image`, `input.Body.HostConfig.Privileged`, `input.Body.User`). Это необходимо, так как плагин `opa-authz` передает в OPA «сырые» запросы, а не абстрактные команды.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo nano /etc/docker/authz.rego
+```
+
+*(В файл записана финальная версия политики на синтаксисе Rego v0)*
+
+```rego
+package docker.authz
+
+default allow = false
+
+allow {
+    count(deny) == 0
+}
+
+is_container_create {
+    input.Method == "POST"
+    contains(input.Path, "/containers/create")
+}
+
+# 1. Блокировка явного тега :latest
+deny[msg] {
+    is_container_create
+    image := input.Body.Image
+    endswith(image, ":latest")
+    msg := "Использование тега :latest запрещено!"
+}
+
+# 1.1 Блокировка отсутствия тега (неявный latest)
+deny[msg] {
+    is_container_create
+    image := input.Body.Image
+    not contains(image, ":")
+    msg := "Укажите явный тег для образа! Использование неявного latest запрещено."
+}
+
+# 2. Блокировка привилегированных контейнеров
+deny[msg] {
+    is_container_create
+    input.Body.HostConfig.Privileged == true
+    msg := "Запуск привилегированных контейнеров запрещен!"
+}
+
+# 3. Блокировка запуска от root (если --user не указан)
+deny[msg] {
+    is_container_create
+    input.Body.User == ""
+    msg := "Запуск от root запрещен! Задайте пользователя через --user."
+}
+
+# 3.1 Блокировка явного root или UID 0
+deny[msg] {
+    is_container_create
+    input.Body.User == "root"
+    msg := "Запуск от root запрещен!"
+}
+
+deny[msg] {
+    is_container_create
+    input.Body.User == "0"
+    msg := "Запуск от UID 0 запрещен!"
+}
+```
+
+<img width="1421" height="1323" alt="image" src="https://github.com/user-attachments/assets/5643ae61-240b-4aea-a11e-d54a252c43b2" />
+
+Политика приведена к финальному виду. Теперь она использует корректные поля Docker API для анализа запросов на создание контейнеров, что обеспечивает правильную блокировку небезопасных сценариев.
 
 
 
