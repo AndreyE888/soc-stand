@@ -276,7 +276,7 @@ cat /etc/docker/daemon.json
 
 <img width="957" height="204" alt="image" src="https://github.com/user-attachments/assets/f9683982-69df-4baa-b63b-ddc75396cb7e" />
 
-Docker настроен доверять Registry по HTTP. Без этой настройки `docker push` завершится ошибкой `http: server gave HTTP response to HTTPS client`, поскольку по умолчанию Docker требует HTTPS. После изменения файла нужно перезапустить Docker: `sudo systemctl restart docker`. **Настройку нужно выполнить на всех VM, которые будут работать с Registry** — то есть на `docker` (и позже на других клиентах).
+Docker настроен доверять Registry по HTTP. Без этой настройки `docker push` завершится ошибкой `http: server gave HTTP response to HTTPS client`, поскольку по умолчанию Docker требует HTTPS. После изменения файла нужно перезапустить Docker: `sudo systemctl restart docker`. 
 
 ### Этап 17: Pull alpine
 
@@ -1521,4 +1521,11 @@ sudo tail -n 1 /var/log/falco/events.log
 <img src="https://github.com/user-attachments/assets/40d80eb7-a936-4b01-9544-13610eab67a1" alt="image" />
 
 В скрипт-перехватчике есть вызов `logger`, который генерирует системное событие при блокировке. При попытке запустить образ с неверным хэшем (`...946725`) скрипт блокирует запуск, а Falco автоматически фиксирует это событие с приоритетом `CRITICAL` и правилом «Заблокирован запуск неподписанного контейнера из Registry».
+
+
+
+
+
+
+
 
