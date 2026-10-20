@@ -1700,7 +1700,47 @@ curl -s http://127.0.0.1:8181/v1/policies
 API OPA вернул JSON-объект с информацией о загруженной политике. В ответе виден исходный код (`raw`), абстрактное синтаксическое дерево (`ast`) и комментарии (`comments`), привязанные к файлу `/etc/opa/policies/authz.rego`. Это подтверждает, что правила успешно загружены в память и готовы к выполнению.
 
 
+### Этап 8: Подключение Docker AuthZ Plugin к демону Docker
 
+**Зачем:** Настроить демон Docker на использование установленного плагина авторизации (`opa-authz`), чтобы все API-запросы (включая запуск контейнеров) проходили проверку в OPA.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo nano /etc/docker/daemon.json
+```
+*(В файл добавлен параметр авторизации)*
+
+```json
+{
+  "authorization-plugins":["opa-authz"]
+}
+```
+
+<img width="1546" height="230" alt="image" src="https://github.com/user-attachments/assets/a81a42c7-c39e-405b-b3a6-e2a2918679bf" />
+
+В конфигурационный файл демона Docker внесена директива `authorization-plugins`, которая указывает использовать плагин `opa-authz`. Теперь Docker перед выполнением операций будет отправлять запросы на проверку политик.
+
+### Этап 9: Настройка AuthZ-плагина Docker
+
+**Зачем:** Установить и активировать официальный плагин `opa-docker-authz`, который будет перехватывать все API-запросы к Docker и перенаправлять их на проверку в OPA.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo /usr/bin/docker plugin install openpolicyagent/opa-docker-authz-v2:0.9 --alias opa-authz --grant-all-permissions
+sudo nano /etc/docker/daemon.json
+sudo systemctl restart docker
+sudo /usr/bin/docker plugin ls
+```
+
+<img width="2529" height="826" alt="image" src="https://github.com/user-attachments/assets/7648b7e3-a0eb-48d9-ba51-1a3ee77bd679" />
+
+Плагин `opa-authz` успешно установлен и активирован (колонка `ENABLED` — `true`). В конфигурацию демона Docker добавлен параметр `authorization-plugins`, и сервис успешно перезапущен. Однако в логах (`journalctl`) видно ошибку `OPA policy file does not exist, failing open and allowing request`. Это означает, что плагин пока не видит файл политики и по умолчанию разрешает все запросы. Следующим шагом будет настройка путей к политике для плагина.
 
 
 
