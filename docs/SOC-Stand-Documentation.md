@@ -2148,10 +2148,57 @@ sudo docker run --rm --user 1000 --cap-add NET_RAW --cap-add SYS_ADMIN alpine:3.
 Все тесты показали ожидаемый результат. Безопасные контейнеры успешно запускаются. При попытке добавить запрещённые capabilities (`SYS_ADMIN`, `ALL`, `NET_ADMIN`) срабатывает блокировка на уровне API (`authorization denied by plugin opa-authz`). Комбинированный тест (`NET_RAW + SYS_ADMIN`) также заблокирован, так как правило проверяет каждую capability в массиве.
 
 
+### Этап 24: Проверка AppArmor для контейнеров
+
+**Зачем:** Убедиться, что Docker применяет дефолтный AppArmor-профиль `docker-default` к контейнерам, ограничивая их доступ к критичным файлам и устройствам хоста.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+# 1. Проверяем, что профиль docker-default загружен в ядро
+sudo aa-status | grep docker-default
+
+# 2. Запускаем тестовый контейнер в фоне (sleep 300 держит его живым 5 минут)
+sudo docker run -d --name apparmor-test --user 1000 alpine:3.19 sleep 300
+
+# 3. Проверяем, какой профиль применён к контейнеру
+sudo docker inspect apparmor-test --format '{{.AppArmorProfile}}'
+```
+
+<img width="2081" height="341" alt="image" src="https://github.com/user-attachments/assets/aa3b7a84-8d92-4639-8681-5a0c27b2edac" />
+
+Профиль `docker-default` загружен в ядро (подтверждено выводом `aa-status`) и успешно применяется к запущенному контейнеру `apparmor-test` (подтверждено выводом `docker inspect`). Это означает, что мандатный контроль доступа активирован и ограничивает системные вызовы контейнера на уровне ядра.
 
 
+### Этап 25: Демонстрация блокировки опасных действий через AppArmor
 
+**Зачем:** На практике доказать, что профиль `docker-default` не просто загружен, а реально блокирует потенциально опасные действия контейнера, направленные на compromise хоста.
 
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+# 1. Попытка записи в /proc/sysrq-trigger (защита от перезагрузки/краша хоста)
+sudo docker exec apparmor-test sh -c "echo 1 > /proc/sysrq-trigger"
+
+# 2. Попытка чтения /etc/shadow (защита от кражи хешей паролей хоста)
+sudo docker exec apparmor-test cat /etc/shadow
+
+# 3. Попытка создания блочного устройства /dev/sda (защита от прямого доступа к диску)
+sudo docker exec apparmor-test mknod /dev/sda b 8 0
+```
+
+<img width="1892" height="318" alt="image" src="https://github.com/user-attachments/assets/58fea347-d75c-437d-aa70-d3cf21998d31" />
+
+Все три попытки опасных действий изнутри контейнера заблокированы на уровне ядра:
+1. Запись в `/proc/sysrq-trigger` завершилась ошибкой `Read-only file system`.
+2. Чтение `/etc/shadow` завершилось ошибкой `Permission denied`.
+3. Создание устройства `/dev/sda` завершилось ошибкой `Permission denied`.
+
+Это доказывает, что AppArmor (профиль `docker-default`) обеспечивает мандатный контроль доступа и эффективно изолирует контейнер от критических ресурсов хоста.
 
 
 
