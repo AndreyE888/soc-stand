@@ -2045,9 +2045,9 @@ deny[msg] {
 
 Политика приведена к финальному виду. Теперь она использует корректные поля Docker API для анализа запросов на создание контейнеров, что обеспечивает правильную блокировку небезопасных сценариев.
 
-### Этап 21: Финальное тестирование политик OPA
+### Этап 21: Тестирование политик OPA
 
-**Зачем:** Убедиться, что итоговая политика безопасности корректно блокирует все небезопасные сценарии запуска контейнеров и разрешает только те, которые соответствуют заданным правилам.
+**Зачем:** Убедиться, что политика безопасности корректно блокирует все небезопасные сценарии запуска контейнеров и разрешает только те, которые соответствуют заданным правилам.
 
 **Где:** VM `docker`.
 
@@ -2070,5 +2070,89 @@ sudo docker run --rm --user 1000 --privileged alpine:3.19 echo "Тест privile
 4. Запуск с `--privileged` — заблокировано.
 
 Это доказывает, что механизм Enforcement на базе OPA работает корректно и обеспечивает контроль доступа на уровне API Docker.
+
+
+### Этап 22: Привязка capabilities к запуску контейнера (OPA)
+
+**Зачем:** Закрыть вектор повышения привилегий через добавление контейнеру опасных Linux capabilities (например, `SYS_ADMIN`, `ALL`). Политика разрешает только безопасный whitelist. Дополнительно добавлена частичная защита от CVE-2026-34040.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo nano /etc/docker/authz.rego
+```
+*(В конец файла добавлены блоки: whitelist `allowed_caps`, правило блокировки опасных capabilities и два правила защиты от CVE-2026-34040)*
+
+```rego
+# Whitelist безопасных capabilities
+allowed_caps = {
+    "CAP_CHOWN", "CAP_DAC_OVERRIDE", "CAP_FSETID", "CAP_FOWNER", "CAP_MKNOD",
+    "CAP_NET_RAW", "CAP_SETGID", "CAP_SETUID", "CAP_SETFCAP", "CAP_SETPCAP",
+    "CAP_NET_BIND_SERVICE", "CAP_SYS_CHROOT", "CAP_KILL", "CAP_AUDIT_WRITE"
+}
+
+# 4. Блокировка опасных capabilities (не входящих в whitelist)
+deny[msg] {
+    is_container_create
+    cap := input.Body.HostConfig.CapAdd[_]
+    not allowed_caps[cap]
+    msg := sprintf("Добавление capability '%s' запрещено! Разрешены только: %v", [cap, allowed_caps])
+}
+
+# 5. Защита от CVE-2026-34040 (частичная, defense-in-depth)
+deny[msg] {
+    is_container_create
+    not input.Body
+    msg := "CVE-2026-34040: пустое тело запроса на create — возможно, попытка обхода AuthZ"
+}
+
+deny[msg] {
+    is_container_create
+    input.Headers["Content-Length"]
+    to_number(input.Headers["Content-Length"]) > 1048576
+    msg := sprintf("CVE-2026-34040: тело запроса %s байт превышает лимит 1MB", [input.Headers["Content-Length"]])
+}
+```
+<img width="2502" height="1262" alt="image" src="https://github.com/user-attachments/assets/286b9512-3e58-4a92-b3c4-fcd028b5094b" />
+
+Добавлен whitelist из 14 безопасных capabilities. Правило `deny` перебирает все элементы массива `CapAdd` (`[_]`) и блокирует запрос, если хотя бы одна capability не входит в whitelist. В ходе тестирования выявлено, что Docker передает capabilities с префиксом `CAP_` и в верхнем регистре (например, `CAP_NET_RAW`), поэтому whitelist содержит имена именно в таком формате. Это подтверждено анализом лога Docker (`journalctl -u docker.service`). Также добавлен блок защиты от CVE-2026-34040: он отклоняет create-запросы с пустым телом или с `Content-Length` > 1 МБ.
+
+### Этап 23: Тестирование политики capabilities
+
+**Зачем:** Убедиться, что OPA корректно блокирует опасные capabilities и не мешает запуску безопасных контейнеров.
+
+**Где:** VM `docker`.
+
+**Команды:**
+
+```bash
+sudo systemctl restart docker
+
+# Разрешённые (должны пройти)
+sudo docker run --rm --user 1000 alpine:3.19 echo "OK: Безопасный запуск"
+sudo docker run --rm --user 1000 --cap-add NET_RAW alpine:3.19 echo "OK: NET_RAW"
+sudo docker run --rm --user 1000 --cap-add CHOWN alpine:3.19 echo "OK: CHOWN"
+sudo docker run --rm --user 1000 --cap-add NET_RAW --cap-add CHOWN alpine:3.19 echo "OK: NET_RAW + CHOWN"
+
+# Запрещённые (должны блокироваться)
+sudo docker run --rm --user 1000 --cap-add SYS_ADMIN alpine:3.19 echo "FAIL: SYS_ADMIN"
+sudo docker run --rm --user 1000 --cap-add ALL alpine:3.19 echo "FAIL: ALL"
+sudo docker run --rm --user 1000 --cap-add NET_ADMIN alpine:3.19 echo "FAIL: NET_ADMIN"
+sudo docker run --rm --user 1000 --cap-add NET_RAW --cap-add SYS_ADMIN alpine:3.19 echo "FAIL: NET_RAW + SYS_ADMIN"
+```
+
+<img width="2530" height="1404" alt="image" src="https://github.com/user-attachments/assets/0d900a4c-1f23-4ff8-9a7f-3b47f8532ad3" />
+
+Все тесты показали ожидаемый результат. Безопасные контейнеры успешно запускаются. При попытке добавить запрещённые capabilities (`SYS_ADMIN`, `ALL`, `NET_ADMIN`) срабатывает блокировка на уровне API (`authorization denied by plugin opa-authz`). Комбинированный тест (`NET_RAW + SYS_ADMIN`) также заблокирован, так как правило проверяет каждую capability в массиве.
+
+
+
+
+
+
+
+
 
 
