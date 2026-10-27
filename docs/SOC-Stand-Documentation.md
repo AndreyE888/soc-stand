@@ -1875,9 +1875,10 @@ sudo nano /etc/docker/daemon.json
 
 ```bash
 sudo /usr/bin/docker plugin install openpolicyagent/opa-docker-authz-v2:0.9 --alias opa-authz --grant-all-permissions
-sudo nano /etc/docker/daemon.json
 sudo systemctl restart docker
 sudo /usr/bin/docker plugin ls
+sudo /usr/bin/docker run --rm alpine:latest echo "Я нарушил правило latest"
+sudo journalctl -u docker.service -n 50 | grep -i opa
 ```
 
 <img width="2529" height="826" alt="image" src="https://github.com/user-attachments/assets/7648b7e3-a0eb-48d9-ba51-1a3ee77bd679" />
@@ -1973,7 +1974,11 @@ ExecStart=/usr/local/bin/opa run --server --addr=0.0.0.0:8181 /etc/opa/policies
 **Команды:**
 
 ```bash
+# 1. Выключаем плагин
+sudo docker plugin disable opa-authz
+# 2. Удаляем его
 sudo docker plugin rm opa-authz
+# 3. Устанавливаем заново с нужным флагом политики
 sudo docker plugin install openpolicyagent/opa-docker-authz-v2:0.9 --alias opa-authz --grant-all-permissions opa-args="-policy-file /opa/authz.rego"
 ```
 
