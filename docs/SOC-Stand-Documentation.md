@@ -346,10 +346,10 @@ docker push docker-registry:5000/alpine
 **Команда:**
 
 ```bash
-curl http://docker-registry:5000/v2/_catalog
+curl -k https://docker-registry:5000/v2/_catalog
 ```
 
-<img width="1226" height="115" alt="image" src="https://github.com/user-attachments/assets/eb055e82-9667-428e-92fa-36fcf11f90d3" />
+<img width="1281" height="126" alt="image" src="https://github.com/user-attachments/assets/aa8d6db3-3b4d-41d6-850e-caa39a55eb8f" />
 
 Образ `alpine` появился в Registry. Push прошёл успешно, Registry хранит образ и готов отдавать его другим клиентам.
 
@@ -530,7 +530,6 @@ Docker перезапущен. Теперь он применит настрой
 
 ```bash
 sudo nano /etc/docker/daemon.json
-cat /etc/docker/daemon.json
 ```
 
 <img width="1003" height="164" alt="image" src="https://github.com/user-attachments/assets/fd428812-4100-485e-89bf-f649113ee57b" />
@@ -657,9 +656,12 @@ sudo nano /etc/apt/sources.list.d/falco.sources
 ```
 
 *(Вставлены 5 строк конфигурации репозитория)*
-
-```bash
-cat /etc/apt/sources.list.d/falco.sources
+```
+Types: deb
+URIs: https://download.falco.org/packages/deb
+Suites: stable
+Components: main
+Signed-By: /usr/share/keyrings/falco-archive-keyring.gpg
 ```
 
 <img width="1278" height="310" alt="image" src="https://github.com/user-attachments/assets/5b22e97b-bb3d-45c1-8a07-565fd833ee43" />
