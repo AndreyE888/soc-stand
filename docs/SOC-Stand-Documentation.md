@@ -836,11 +836,12 @@ sudo cat /var/log/falco/events.log
 ```bash
 sudo nano /etc/rsyslog.d/50-falco.conf
 ```
+*(В файл добавлены модуль imfile, input с указанием файла Falco и action для отправки по TCP)*
 
-*(Вставлены модуль `imfile`, `input` с указанием файла Falco и `action` для отправки по TCP)*
-
-```bash
-cat /etc/rsyslog.d/50-falco.conf
+```
+module(load="imfile")
+input(type="imfile" File="/var/log/falco/events.log" Tag="falco" StateFile="falco-state")
+*.* action(type="omfwd" target="192.168.56.12" port="514" protocol="tcp")
 ```
 
 <img width="1729" height="253" alt="image" src="https://github.com/user-attachments/assets/95e78a10-febd-4c38-8865-f1e255e3d0f1" />
