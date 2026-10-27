@@ -1431,6 +1431,36 @@ docker ps -a
 nano safe-run.sh
 chmod +x safe-run.sh
 ```
+*Содержимое файла safe-run.sh)*
+```
+#!/bin/bash
+
+# Проверяем, передан ли аргумент (имя образа)
+if [ -z "$1" ]; then
+    echo "Ошибка: укажите имя образа для запуска."
+    echo "Пример: ./safe-run.sh docker-registry:5000/my-signed-app:v1"
+    exit 1
+fi
+
+IMAGE="$1"
+shift # Сдвигаем аргументы, чтобы передать остальные команды в docker run
+
+echo "Проверка подписи для образа: $IMAGE..."
+
+# Запускаем проверку через cosign.
+# Флаг --registry-cacert нужен, так как у нас самоподписанный Registry.
+cosign verify --key /home/vagrant/cosign.pub --registry-cacert /etc/docker/certs.d/docker-registry:5000/ca.crt "$IMAGE" > /dev/null 2>&1
+
+# Проверяем код возврата предыдущей команды
+if [ $? -eq 0 ]; then
+    echo "Подпись валидна. Запускаем контейнер..."
+    docker run --rm "$IMAGE" "$@"
+else
+    echo "ОШИБКА БЕЗОПАСНОСТИ: Подпись не найдена или недействительна!"
+    echo "Запуск контейнера заблокирован."
+    exit 1
+fi
+```
 <img src="https://github.com/user-attachments/assets/db748f5b-9f07-4974-97cf-284e1000ca10" alt="image" />
 <img width="797" height="126" alt="image" src="https://github.com/user-attachments/assets/bb142b03-18e9-4cf9-94fb-6bad08e64957" />
 
@@ -1465,14 +1495,48 @@ chmod +x safe-run.sh
 sudo nano /usr/local/bin/docker
 sudo chmod +x /usr/local/bin/docker
 ```
+*(Содержимое файла /usr/local/bin/docker)*
+```
+#!/bin/bash
+
+# Если первая команда - run, то перехватываем
+if [ "$1" == "run" ]; then
+    IMAGE=""
+    # Проходимся по всем аргументам после run, чтобы найти имя образа
+    for arg in "${@:2}"; do
+        # Ищем первый аргумент, который не начинается с дефиса (это и есть имя образа)
+        if [[ ! "$arg" == -* ]]; then
+            IMAGE="$arg"
+            break
+        fi
+    done
+
+    # Если нашли образ, проверяем его подпись
+    if [ -n "$IMAGE" ]; then
+        echo "[Enforcement] Проверка подписи для образа: $IMAGE..."
+        # Проверяем подпись через Cosign (скрываем вывод)
+        cosign verify --key /home/vagrant/cosign.pub --registry-cacert /etc/docker/certs.d/docker-registry:5000/ca.crt "$IMAGE" > /dev/null 2>&1
+        
+        if [ $? -ne 0 ]; then
+            echo "ОШИБКА БЕЗОПАСНОСТИ: Образ '$IMAGE' не подписан или подпись недействительна!"
+            echo "Запуск контейнера заблокирован."
+            logger -t falco-enforcement "БЛОКИРОВКА: Попытка запуска неподписанного образа $IMAGE"
+            exit 1
+        else
+            echo "Подпись валидна. Запускаем контейнер..."
+        fi
+    fi
+fi
+
+# Передаем управление настоящему Docker
+exec /usr/bin/docker "$@"
+```
 
 <img width="2552" height="1299" alt="image" src="https://github.com/user-attachments/assets/ab3535ce-120a-459f-9414-7180caf46684" />
 <img width="1042" height="121" alt="image" src="https://github.com/user-attachments/assets/5a6a7fcd-abe9-4a84-b9d9-bb6596d9e27f" />
 
 
 Создан скрипт-перехватчик в директории /usr/local/bin/ (которая имеет приоритет над /usr/bin/). Команда chmod +x сделала файл исполняемым. Теперь при вызове команды docker run система сначала запускает скрипт: он анализирует аргументы, находит имя образа, проверяет подпись через Cosign и вызывает оригинальный Docker (/usr/bin/docker) только в случае успешной проверки
-
-
 
 ### Этап 12: Тестирование блокировки неподписанного контейнера через глобальный перехват
 
@@ -1518,6 +1582,43 @@ docker run --rm docker-registry:5000/my-signed-app:v1
 ```bash
 sudo nano /etc/falco/falco_rules.local.yaml
 ```
+*(Итоговый файл)*
+```
+- rule: Запуск привилегированного контейнера
+  desc: Обнаружен запуск Docker-контейнера с флагом --privileged (потенциальный container escape)
+  condition: >
+    spawned_process and proc.name = "docker"
+    and proc.args contains "--privileged"
+    and proc.args contains "run"
+  output: >
+    Привилегированный контейнер запущен
+    (user=%user.name command=%proc.cmdline parent=%proc.pname)
+  priority: WARNING
+  tags: [container, mitre_privilege_escalation, T1610, T1611]
+
+- rule: Запуск контейнера из недоверенного источника
+  desc: Обнаружена попытка запуска контейнера, не принадлежащего доверенному Registry
+  condition: >
+    spawned_process and proc.name = "docker"
+    and proc.args contains "run"
+    and not proc.args contains "docker-registry:5000"
+  output: >
+    Обнаружена попытка запуска контейнера из недоверенного источника
+    (user=%user.name command=%proc.cmdline)
+  priority: WARNING
+  tags: [container, mitre_privilege_escalation]
+
+- rule: Заблокирован запуск неподписанного контейнера из Registry
+  desc: Скрипт-перехватчик заблокировал запуск образа без валидной подписи
+  condition: >
+    spawned_process and proc.name = "logger"
+    and proc.args contains "falco-enforcement"
+  output: >
+    Зафиксирована попытка запуска неподписанного контейнера
+    (user=%user.name command=%proc.cmdline)
+  priority: CRITICAL
+  tags: [container, mitre_privilege_escalation]
+  ```
 
 <img src="https://github.com/user-attachments/assets/36c212d5-059b-494c-8f37-8204cca205d5" alt="image" />
 
@@ -1730,6 +1831,9 @@ ExecStart=/usr/local/bin/opa run --server --addr=127.0.0.1:8181 /etc/opa/policie
 **Команды:**
 
 ```bash
+# Применяем изменения в конфигурации службы и перезапускаем OPA
+sudo systemctl daemon-reload
+sudo systemctl restart opa
 curl -s http://127.0.0.1:8181/v1/policies
 ```
 
