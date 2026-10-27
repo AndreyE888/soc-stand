@@ -879,7 +879,11 @@ sudo nano /etc/rsyslog.d/50-remote.conf
 ```
 
 *(Вставлен шаблон `RemoteLogs` и правило `*.* ?RemoteLogs` с остановкой `& stop`)*
-
+```
+$template RemoteLogs,"/var/log/remote/%HOSTNAME%/%PROGRAMNAME%.log"
+*.* ?RemoteLogs
+& stop
+```
 <img width="1632" height="213" alt="image" src="https://github.com/user-attachments/assets/63d01c93-dd7f-4b04-8d86-5c1111064241" />
 
 Создан шаблон `$template RemoteLogs`. Теперь все входящие логи будут сохраняться в `/var/log/remote/<имя_хоста>/<имя_программы>.log`. Это позволяет не смешивать логи от `docker` и `docker_registry` в одну кучу.
@@ -951,6 +955,11 @@ sudo systemctl status rsyslog
 sudo nano /etc/rsyslog.d/50-falco.conf
 ```
 *(Из конфига убран параметр `StateFile="falco-state"`)*
+```
+module(load="imfile")
+input(type="imfile" File="/var/log/falco/events.log" Tag="falco")
+*.* action(type="omfwd" target="192.168.56.12" port="514" protocol="tcp")
+```
 
 ```bash
 cat /etc/rsyslog.d/50-falco.conf
@@ -1027,7 +1036,20 @@ sudo cat /var/log/remote/docker/falco.log
 ```bash
 sudo nano /etc/falco/falco_rules.local.yaml
 ```
-
+*(В файл добавлено следующее правило)*
+```
+- rule: Запуск привилегированного контейнера
+  desc: Обнаружен запуск Docker-контейнера с флагом --privileged (потенциальный container escape)
+  condition: >
+    spawned_process and proc.name = "docker"
+    and proc.args contains "--privileged"
+    and proc.args contains "run"
+  output: >
+    Привилегированный контейнер запущен
+    (user=%user.name command=%proc.cmdline parent=%proc.pname)
+  priority: WARNING
+  tags: [container, mitre_privilege_escalation, T1610, T1611]
+```
 
 <img src="https://github.com/user-attachments/assets/b982b969-0675-468a-a118-79904bc65c1a" alt="image" />
 
@@ -1068,7 +1090,7 @@ sudo tail -n 5 /var/log/remote/docker/falco.log
 
 В логе на `storage` отображается событие `Warning Привилегированный контейнер запущен`, сгенерированное на `docker`. Цепочка Falco → rsyslog → storage работает корректно для кастомных правил.
 
-## Интеграция Falco с Telegram (Falcosidekick)
+## Интеграция Falco с Telegram (Falcosidekick) (НЕ ОБЯЗАТЕЛЬНО. ИЗ-ЗА БЛОКИРОВКИ TELEGRAM НЕ ПОЛУЧИЛОСЬ ИНТЕГРИРОВАТЬ FALCO С TELEGRAM)
 ### Этап 1: Загрузка утилиты Falcosidekick
 
 **Зачем:** Скачать бинарный файл Falcosidekick, который будет выступать в роли промежуточного звена для пересылки алертов Falco во внешние системы (например, Telegram).
